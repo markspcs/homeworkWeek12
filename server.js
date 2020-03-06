@@ -1,6 +1,7 @@
 const inquirer = require("inquirer");
 const mysql = require('mysql');
 const figlet = require('figlet');
+const debug = 1;
 const port = 3306;
 
 const connection = mysql.createConnection({
@@ -11,13 +12,19 @@ const connection = mysql.createConnection({
     database: 'homework12',
   });
 
+const managers = [];
+const depts = [];
+const roles = [];
+const users = [];
+
 connection.connect((err) => {
     if (err) throw err;
   });
-console.log("beginning");
+debug && console.log("beginning");
+
 main()
 .then(function(result) {
-  console.log("end");
+  debug && console.log("end");
   quit();
 });
 //////////////////////////////////////////////
@@ -33,6 +40,7 @@ async function main() {
     horizontalLayout: 'default',
     verticalLayout: 'default',
   }));
+  getInfo();
   await menu();
   console.log("end of main");
 //  promptNext();
@@ -42,21 +50,6 @@ async function main() {
 //////////////////////////////////////////////////////
 //Main menu
 async function menu() {
-  //await getUsers();
-  //await getRoles();
-  //await getDepartments();
-  // const choices = [
-  //   'Quit',
-  //   'View all Employees',
-  //   'View Roles',
-  //   'View Departments',
-  //   'Add an Employee',
-  //   'Add a Role',
-  //   'Add a Department',
-  //   'Update Employee Role',
-  //   'Update Employee Manager',
-  //   'Delete an Employee',
-  // ];
   const choices = await inquirer.prompt([
     {
       type: 'list',
@@ -76,11 +69,11 @@ async function menu() {
       ],
     },
   ]);
-  console.log(choices.whatToDo);
+  debug && console.log(choices.whatToDo);
   switch (choices.whatToDo) {
     case 'View all Employees':
       //const employees = await showEmployees();
-      console.table(employees);
+      console.table(await listEmployees());
       break;
     case 'View Roles':
       //const roles = await readRoles();
@@ -91,8 +84,8 @@ async function menu() {
       console.table(depts);
       break;
     case 'Add an Employee':
-      //await addEmployee();
-      console.log("add employyyyy");
+      await addEmpl();
+      debug && console.log("add employ");
       break;
     case 'Add a Role':
       //await addRole();
@@ -116,6 +109,58 @@ async function menu() {
   console.log("ended");
   return;
   //return choices.whatToDo;
+}
+////////////////////////////////////////////////////////
+function listEmployees() {
+  return new Promise((resolve, reject) => {
+    connection.query(
+      "SELECT employee_id, first_name, last_name, title, name as department, salary, " +
+      "(SELECT CONCAT(first_name, ' ', last_name) FROM employee WHERE employee_id = employee.manager_id) AS manager " +
+       "FROM employee left join role on employee.role_id = role.role_id " +
+       "left join department on role.department_id = department.department_id",
+      (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      },
+    );
+  });
+}
+////////////////////////////////////////////////////////
+function getInfo() {
+  // Run Query
+  connection.query("SELECT CONCAT(first_name, ' ', last_name) as name, employee_id FROM employee", (err, res) => {
+    if (err) throw err;
+    //users.length = 0;
+    //managers.length = 0;
+    //managers.push({ message: 'None', value: '0' });
+    res.forEach((element) => {
+      let user = { name: '', id: '' };
+      user.name = element.name;
+      user.id = element.employee_id.toString();
+      users.push(user);
+      managers.push(user);
+    });
+  });
+  connection.query("SELECT title, role_id FROM role", (err, res) => {
+    if (err) throw err;
+    //roles.length = 0;
+    res.forEach((element) => {
+      const user = { title: '', id: '' };
+      user.title = element.title;
+      user.roleId = element.role_id.toString();
+      roles.push(user);
+    });
+  });
+  connection.query("SELECT name, department_id FROM department", (err, res) => {
+    if (err) throw err;
+    //departments.length = 0;
+    res.forEach((element) => {
+      const user = { dept: '', id: '' };
+      user.dept = element.dept_name;
+      user.id = element.department_id.toString();
+      depts.push(user);
+    });
+  });
 }
 ////////////////////////////////////////////////////////   
 function quit() {
@@ -284,36 +329,7 @@ function quit() {
     });
   }
 
-  async function addEmployee() {
-    await prompt([
-      {
-        type: 'input',
-        message: 'Enter First Name: ',
-        name: 'firstName',
-      },
-      {
-        type: 'input',
-        message: 'Enter Last Name: ',
-        name: 'lastName',
-      },
-      {
-        type: 'select',
-        message: 'Choose a Role: ',
-        name: 'roleID',
-        choices: roles,
-      },
-      {
-        type: 'select',
-        message: 'Choose a Manager: ',
-        name: 'managerID',
-        choices: managers,
-      },
-    ]).then((answers) => {
-      const roleID = +answers.roleID;
-      const managerID = (answers.managerID === '0') ? null : +answers.managerID;
-      createEmployee(answers.firstName, answers.lastName, roleID, managerID);
-    });
-  }
+
   async function addRole() {
     await prompt([
       {
@@ -435,4 +451,4 @@ function quit() {
     promptNext();
   }
 
-   
+ 
