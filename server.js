@@ -5,8 +5,17 @@ const figlet = require('figlet');
 const debug = 1;
 const port = 3306;
 
-SELECT employee_id as employeeId, manager_id as man, (SELECT CONCAT(first_name, ' ', last_name) as manager FROM employee  WHERE man = employee_id) AS manager
-FROM employee emp;
+// select employeeId, first_name, last_name, position, department, manager from (SELECT employee_id as employeeId, first_name, last_name, title as position, name as department, manager_id as man, (SELECT CONCAT(first_name, ' ', last_name) as manager FROM employee  WHERE man = employee_id) AS manager
+// FROM employee left join role on employee.role_id = role.role_id left join department on role.department_id = department.department_id) as tableTest;
+
+
+
+// SELECT e.employee_id, e.first_name, e.last_name, role.title, department.name as department, role.salary, CONCAT(m.first_name, ' ', m.last_name) as manager
+// FROM employee e
+// left join employee m on e.manager_id = m.employee_id 
+// left join role on e.role_id = role.role_id 
+// left join department on role.department_id = department.department_id
+
 
 const connection = mysql.createConnection({
     host: 'localhost',
@@ -129,11 +138,12 @@ async function createRole() {
       type: 'select',
       message: 'Choose a Department: ',
       name: 'deptId',
-      choices: departments,
+      choices: depts,
     },
   ]).then((a) => {
-    createRole(a.title, a.salary, +a.deptId);
+    insertRole(a.title, a.salary, +a.deptId);
   });
+  return;
 }
 ////////////////////////////////////////////////
 function insertRole(title, salary, deptId) {
@@ -142,13 +152,14 @@ function insertRole(title, salary, deptId) {
     {
       title: title,
       salary: salary,
-      dept_id: deptId,
+      department_id: deptId,
     },
     (err, res) => {
       if (err) throw err;
-      console.log(`${res.affectedRows} Role created\n`);
+      console.log(`${res.affectedRows} Role named ${title} created\n`);
     },
   );
+    roles.push({message: title, value: 8});
 }
 /////////////////////////////////////////////////
 async function createEmployee() {
@@ -177,10 +188,7 @@ async function createEmployee() {
       choices: managers,
     },
   ]).then((a) => {
-    //const roleID = +a.roleId;
-    //const managerID =  +a.managerId;
     console.log(`roleId: ${a.roleId} manager: ${a.managerId} \n`);
-    //make manager and role answers go directly to createEmployee
     insertEmployee(a.first, a.last, a.roleId, a.managerId);
   });
   return;
@@ -223,8 +231,11 @@ function listRoles() {
 function listEmployees() {
   return new Promise((resolve, reject) => {
     connection.query(
-      "SELECT employee_id, first_name, last_name, title, name as department, salary, (SELECT CONCAT(first_name, ' ', last_name) FROM employee WHERE employee_id = employee.manager_id) AS manager " +
-       "FROM employee left join role on employee.role_id = role.role_id left join department on role.department_id = department.department_id",
+      `SELECT e.employee_id, e.first_name, e.last_name, role.title, department.name as department, role.salary, CONCAT(m.first_name, ' ', m.last_name) as manager
+      FROM employee e
+      left join employee m on e.manager_id = m.employee_id 
+      left join role on e.role_id = role.role_id 
+      left join department on role.department_id = department.department_id`,
       (err, res) => {
         if (err) reject(err);
         resolve(res);
@@ -263,9 +274,10 @@ function getInfo() {
     if (err) throw err;
     //departments.length = 0;
     res.forEach((element) => {
-      let c = { dept: '', id: '' };
-      c.message = element.dept_name;
+      let c = { message: '', value: '' };
+      c.message = element.name;
       c.value = element.department_id.toString();
+      debug && console.log(`depts: ${c.message} and ${c.value}`);
       depts.push(c);
     });
   });
@@ -304,20 +316,20 @@ function quit() {
   //     },
   //   );
   // }
-  function createRole(title, salary, dept_id) {
-    connection.query(
-      'INSERT INTO role SET ?',
-      {
-        title: title,
-        salary: salary,
-        dept_id: dept_id,
-      },
-      (err, res) => {
-        if (err) throw err;
-        console.log(`${res.affectedRows} Role inserted!\n`);
-      },
-    );
-  }
+  // function createRole(title, salary, dept_id) {
+  //   connection.query(
+  //     'INSERT INTO role SET ?',
+  //     {
+  //       title: title,
+  //       salary: salary,
+  //       dept_id: dept_id,
+  //     },
+  //     (err, res) => {
+  //       if (err) throw err;
+  //       console.log(`${res.affectedRows} Role inserted!\n`);
+  //     },
+  //   );
+  // }
   function createDepartment(dept_name) {
     connection.query(
       'INSERT INTO department SET ?',
