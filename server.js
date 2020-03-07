@@ -1,8 +1,12 @@
 const inquirer = require("inquirer");
+const { prompt } = require('enquirer');
 const mysql = require('mysql');
 const figlet = require('figlet');
 const debug = 1;
 const port = 3306;
+
+SELECT employee_id as employeeId, manager_id as man, (SELECT CONCAT(first_name, ' ', last_name) as manager FROM employee  WHERE man = employee_id) AS manager
+FROM employee emp;
 
 const connection = mysql.createConnection({
     host: 'localhost',
@@ -27,6 +31,8 @@ main()
   debug && console.log("end");
   quit();
 });
+
+
 //////////////////////////////////////////////
 //Main everything starts here
 async function main() {
@@ -41,8 +47,11 @@ async function main() {
     verticalLayout: 'default',
   }));
   getInfo();
-  await menu();
-  console.log("end of main");
+  let cont = 1;
+  while (cont) { 
+    cont = await menu();
+    console.log("end of main");
+  };
 //  promptNext();
   
   return;
@@ -50,22 +59,21 @@ async function main() {
 //////////////////////////////////////////////////////
 //Main menu
 async function menu() {
-  const choices = await inquirer.prompt([
+  const choices = await prompt([
     {
-      type: 'list',
+      type: 'select',
       message: 'What would you like to do?',
       name: 'whatToDo',
       choices: [
-        'Quit',
+       
         'View all Employees',
-        'View Roles',
-        'View Departments',
-        'Add an Employee',
+        'View all Employess by Roles',
+        'View all Employees by Department',
+        'Add a Employee',
         'Add a Role',
         'Add a Department',
-        'Update Employee Role',
-        'Update Employee Manager',
-        'Delete an Employee'
+        'Update Employees Role',
+        'Quit'
       ],
     },
   ]);
@@ -75,15 +83,15 @@ async function menu() {
       //const employees = await showEmployees();
       console.table(await listEmployees());
       break;
-    case 'View Roles':
+    case 'View all Employess by Roles':
       //const roles = await readRoles();
       console.table(await listRoles());
       break;
-    case 'View Departments':
+    case 'View all Employees by Department':
       //const depts = await readDepartments();
       console.table(await listDepartments());
       break;
-    case 'Add an Employee':
+    case 'Add a Employee':
       debug && console.log("add employ");
       await createEmployee();
       break;
@@ -94,22 +102,15 @@ async function menu() {
     case 'Add a Department':
       //await addDepartment();
       break;
-    case 'Update Employee Role':
+    case 'Update Employees Role':
       //await updateRole();
       break;
-    case 'Update Employee Manager':
-      //await updateManager();
-      break;
-    case 'Delete an Employee':
-      //await deleteEmployee();
-      break;
     default:
-      quit();
-      break;
+      return 0;  
+      //quit();
   }
-  console.log("ended");
-  return;
-  //return choices.whatToDo;
+  return 1;
+
 }
 /////////////////////////////////////////////////
 async function createRole() {
@@ -151,6 +152,7 @@ function insertRole(title, salary, deptId) {
 }
 /////////////////////////////////////////////////
 async function createEmployee() {
+  debug && console.log("in createEmployee \n" + "\n");
   await prompt([
     {
       type: 'input',
@@ -175,11 +177,13 @@ async function createEmployee() {
       choices: managers,
     },
   ]).then((a) => {
-    const roleID = +a.roleId;
-    const managerID = (a.managerID === '0') ? null : +a.managerID;
+    //const roleID = +a.roleId;
+    //const managerID =  +a.managerId;
+    console.log(`roleId: ${a.roleId} manager: ${a.managerId} \n`);
     //make manager and role answers go directly to createEmployee
-    insertEmployee(answers.first, answers.last, roleId, managerId);
+    insertEmployee(a.first, a.last, a.roleId, a.managerId);
   });
+  return;
 }
 //////////////////////////////////////////////////////////////
 function insertEmployee(first, last, roleId, managerId) {
@@ -237,31 +241,32 @@ function getInfo() {
     //managers.length = 0;
     //managers.push({ message: 'None', value: '0' });
     res.forEach((element) => {
-      let user = { name: '', id: '' };
-      user.name = element.name;
-      user.id = element.employee_id.toString();
-      users.push(user);
-      managers.push(user);
+      let a = { message: '', value: '' };
+      a.message = element.name;
+      a.value = element.employee_id.toString();
+      users.push(a);
+      managers.push(a);
     });
   });
   connection.query("SELECT title, role_id FROM role", (err, res) => {
     if (err) throw err;
     //roles.length = 0;
     res.forEach((element) => {
-      const user = { title: '', id: '' };
-      user.title = element.title;
-      user.roleId = element.role_id.toString();
-      roles.push(user);
+      let b = { message: '', value: '' };
+      b.message = element.title;
+      b.value = element.role_id.toString();
+      debug && console.log(`roles: ${b.message} and ${b.value}`);
+      roles.push(b);
     });
   });
   connection.query("SELECT name, department_id FROM department", (err, res) => {
     if (err) throw err;
     //departments.length = 0;
     res.forEach((element) => {
-      const user = { dept: '', id: '' };
-      user.dept = element.dept_name;
-      user.id = element.department_id.toString();
-      depts.push(user);
+      let c = { dept: '', id: '' };
+      c.message = element.dept_name;
+      c.value = element.department_id.toString();
+      depts.push(c);
     });
   });
 }
@@ -284,21 +289,21 @@ function quit() {
       );
     });
   }
-  function createEmployee(first_name, last_name, role_id, manager_id) {
-    connection.query(
-      'INSERT INTO employee SET ?',
-      {
-        first_name: first_name,
-        last_name: last_name,
-        role_id: role_id,
-        manager_id: manager_id,
-      },
-      (err, res) => {
-        if (err) throw err;
-        console.log(`${res.affectedRows} Employee inserted!\n`);
-      },
-    );
-  }
+  // function createEmployee(first_name, last_name, role_id, manager_id) {
+  //   connection.query(
+  //     'INSERT INTO employee SET ?',
+  //     {
+  //       first_name: first_name,
+  //       last_name: last_name,
+  //       role_id: role_id,
+  //       manager_id: manager_id,
+  //     },
+  //     (err, res) => {
+  //       if (err) throw err;
+  //       console.log(`${res.affectedRows} Employee inserted!\n`);
+  //     },
+  //   );
+  // }
   function createRole(title, salary, dept_id) {
     connection.query(
       'INSERT INTO role SET ?',
